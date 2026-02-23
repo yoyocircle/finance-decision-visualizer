@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>理財決策分析儀表板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #E2E8F0;
+            border-radius: 3px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #2563EB;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .accent-emerald::-webkit-slider-thumb { background: #10B981 !important; }
+        .accent-rose::-webkit-slider-thumb { background: #F43F5E !important; }
+        .accent-slate::-webkit-slider-thumb { background: #94A3B8 !important; }
+
+        /* --- 終極解決方案：下方彈出式 Tooltip --- */
+        .tooltip {
+            position: relative;
+            cursor: help;
+            display: inline-flex;
+            align-items: center;
+        }
+        
+        /* 預設：向上彈出 (用於側邊欄) */
+        .tooltip::after {
+            content: attr(data-tip);
+            position: absolute;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%) scale(0.9);
+            background: #1e293b;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            width: 180px;
+            z-index: 9999;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            line-height: 1.5;
+            text-align: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            white-space: normal;
+        }
+        
+        .tooltip::before {
+            content: '';
+            position: absolute;
+            bottom: 110%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: #1e293b;
+            z-index: 9999;
+            opacity: 0;
+            transition: all 0.2s ease;
+            pointer-events: none;
+        }
+
+        /* 表格專用：向下彈出，解決被 overflow 裁切的問題 */
+        .table-tooltip::after {
+            bottom: auto;
+            top: 140%; /* 改為向下彈出 */
+        }
+        .table-tooltip::before {
+            bottom: auto;
+            top: 120%;
+            border-top-color: transparent;
+            border-bottom-color: #1e293b;
+        }
+
+        .tooltip:hover::after, .tooltip:hover::before {
+            opacity: 1;
+            transform: translateX(-50%) scale(1);
+        }
+
+        /* 右側對齊優化 */
+        .tooltip-right-align::after {
+            left: auto;
+            right: 0;
+            transform: translateX(0) scale(0.9);
+        }
+        .tooltip-right-align:hover::after {
+            transform: translateX(0) scale(1);
+        }
+        .tooltip-right-align::before {
+            left: auto;
+            right: 8px;
+            transform: translateX(0);
+        }
+
+        /* 關鍵：修正表格容器溢出問題 */
+        .table-wrap {
+            position: relative;
+            background: white;
+            border-radius: 1rem;
+            border: 1px solid #e2e8f0;
+        }
+        .table-scroll {
+            overflow-x: auto;
+            overflow-y: visible; /* 允許垂直方向內容溢出 */
+            -webkit-overflow-scrolling: touch;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            min-width: 600px; /* 確保小螢幕可滑動但內容不擠壓 */
+        }
+        /* 增加 row 的高度，給向下彈出的 Tooltip 更多緩衝空間 */
+        tr {
+            position: relative;
+        }
+    </style>
+</head>
+<body class="bg-[#F8FAFC] text-slate-900 antialiased p-4 md:p-6">
+    <div class="max-w-6xl mx-auto">
+        
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-slate-200 pb-4">
+            <div>
+                <h1 class="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                    <span class="bg-blue-600 text-white p-1 rounded-md px-2"><i class="fas fa-chart-pie text-sm"></i></span>
+                    理財決策分析儀表板
+                </h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="text-[10px] font-bold text-slate-400 bg-white px-2 py-1 rounded border border-slate-200 shadow-sm uppercase tracking-wider">
+                    Net Profit & Purchase Power Analysis
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Sidebar -->
+            <div class="lg:col-span-3 space-y-4">
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <i class="fas fa-sliders-h"></i> 參數設定
+                    </h3>
+                    
+                    <div class="space-y-4">
+                        <section>
+                            <label class="text-[10px] font-bold text-slate-500 mb-1.5 block uppercase flex items-center gap-1">
+                                決策本金 (TWD)
+                                <span class="tooltip" data-tip="您目前手中可用於「還房貸」或「投資市場」的現金總額。">
+                                    <i class="fas fa-info-circle text-slate-300"></i>
+                                </span>
+                            </label>
+                            <input type="number" id="initialAmount" value="1000000" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm font-bold text-blue-600 outline-none">
+                        </section>
+
+                        <section>
+                            <div class="flex justify-between items-center mb-1.5">
+                                <label class="text-[10px] font-bold text-slate-500 uppercase">預計期間</label>
+                                <span id="yearsVal" class="text-blue-600 font-bold text-xs">20 年</span>
+                            </div>
+                            <input type="range" id="years" min="1" max="40" value="20" class="w-full">
+                        </section>
+
+                        <div class="pt-4 border-t border-slate-100 space-y-4">
+                            <section>
+                                <div class="flex justify-between items-center mb-1.5">
+                                    <label class="text-[10px] font-bold text-emerald-600 uppercase">投資投報率</label>
+                                    <span id="investRateVal" class="text-xs font-black text-emerald-600">6%</span>
+                                </div>
+                                <input type="range" id="investmentRate" min="0" max="20" step="0.1" value="6.0" class="w-full accent-emerald">
+                            </section>
+
+                            <section>
+                                <div class="flex justify-between items-center mb-1.5">
+                                    <label class="text-[10px] font-bold text-rose-500 uppercase">房貸年利率</label>
+                                    <span id="loanRateVal" class="text-xs font-black text-rose-500">2.2%</span>
+                                </div>
+                                <input type="range" id="loanRate" min="0.1" max="10" step="0.1" value="2.2" class="w-full accent-rose">
+                            </section>
+
+                            <section>
+                                <div class="flex justify-between items-center mb-1.5">
+                                    <label class="text-[10px] font-bold text-slate-400 uppercase">年通膨率</label>
+                                    <span id="inflationRateVal" class="text-xs font-black text-slate-400">3%</span>
+                                </div>
+                                <input type="range" id="inflationRate" min="0" max="15" step="0.5" value="3.0" class="w-full accent-slate">
+                            </section>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="lg:col-span-9 space-y-4">
+                
+                <!-- Decision Summary Card -->
+                <div id="summaryCard" class="p-5 rounded-2xl border transition-all duration-500 flex flex-col md:flex-row md:items-center gap-4">
+                    <div id="summaryIcon" class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 text-white text-xl"></div>
+                    <div class="flex-1">
+                        <h2 id="summaryTitle" class="text-base font-black"></h2>
+                        <p id="summaryDesc" class="text-xs text-slate-600 font-medium"></p>
+                    </div>
+                    <div class="md:text-right border-t md:border-t-0 md:border-l border-slate-200 pt-3 md:pt-0 md:pl-6">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase block tracking-widest mb-1 flex items-center md:justify-end gap-1">
+                            淨收益差額
+                            <span class="tooltip tooltip-right-align" data-tip="兩方案在規劃期末累積淨值的絕對差額。">
+                                <i class="fas fa-question-circle text-slate-300"></i>
+                            </span>
+                        </span>
+                        <span id="nominalDiffVal" class="text-2xl font-black italic tracking-tighter text-slate-800"></span>
+                    </div>
+                </div>
+
+                <!-- Comparison Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div id="loanCard" class="p-4 rounded-2xl border bg-white relative">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                            方案 A：提前償還房貸
+                            <span class="tooltip" data-tip="直接還本金，省下複利滾動的房貸利息支出。">
+                                <i class="fas fa-info-circle text-slate-300"></i>
+                            </span>
+                        </h4>
+                        <div id="loanFinalNominal" class="text-2xl font-black text-slate-800 mt-2"></div>
+                        <div class="text-[10px] font-bold text-rose-500 uppercase mt-1 italic">累積節省利息</div>
+                    </div>
+
+                    <div id="investCard" class="p-4 rounded-2xl border bg-white relative">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                            方案 B：投入市場投資
+                            <span class="tooltip tooltip-right-align" data-tip="將錢投入預期回報更高的資產中滾動複利。">
+                                <i class="fas fa-info-circle text-slate-300"></i>
+                            </span>
+                        </h4>
+                        <div id="investFinalNominal" class="text-2xl font-black text-slate-800 mt-2"></div>
+                        <div class="text-[10px] font-bold text-emerald-600 uppercase mt-1 italic">累積投資獲利</div>
+                    </div>
+                </div>
+
+                <!-- Data Table -->
+                <div class="table-wrap overflow-visible">
+                    <div class="px-5 py-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center rounded-t-2xl">
+                        <h3 class="text-[10px] font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
+                            <i class="fas fa-table text-blue-500"></i> 年度預測詳情
+                        </h3>
+                    </div>
+                    <div class="table-scroll">
+                        <table class="text-left">
+                            <thead class="bg-white">
+                                <tr class="text-[9px] text-slate-400 font-black border-b border-slate-100 uppercase tracking-tighter">
+                                    <th class="px-5 py-4">預測年份</th>
+                                    <th class="px-5 py-4 text-right">
+                                        方案 A (省利息)
+                                        <span class="tooltip table-tooltip" data-tip="該筆本金如果不還房貸，每年會產生的利息累積。">
+                                            <i class="fas fa-info-circle text-slate-300 ml-1"></i>
+                                        </span>
+                                    </th>
+                                    <th class="px-5 py-4 text-right">
+                                        方案 B (投報收益)
+                                        <span class="tooltip table-tooltip" data-tip="該筆本金投入股市後的複利增長收益。">
+                                            <i class="fas fa-info-circle text-slate-300 ml-1"></i>
+                                        </span>
+                                    </th>
+                                    <th class="px-5 py-4 text-right bg-slate-100/30">
+                                        實質剩餘購買力
+                                        <span class="tooltip table-tooltip tooltip-right-align" data-tip="考慮通膨後，原始本金在該年份的實際價值。">
+                                            <i class="fas fa-info-circle text-slate-300 ml-1"></i>
+                                        </span>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody" class="divide-y divide-slate-50 text-[11px]"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const inputs = {
+            initialAmount: document.getElementById('initialAmount'),
+            years: document.getElementById('years'),
+            investmentRate: document.getElementById('investmentRate'),
+            loanRate: document.getElementById('loanRate'),
+            inflationRate: document.getElementById('inflationRate')
+        };
+
+        const displays = {
+            yearsVal: document.getElementById('yearsVal'),
+            investRateVal: document.getElementById('investRateVal'),
+            loanRateVal: document.getElementById('loanRateVal'),
+            inflationRateVal: document.getElementById('inflationRateVal'),
+            summaryCard: document.getElementById('summaryCard'),
+            summaryIcon: document.getElementById('summaryIcon'),
+            summaryTitle: document.getElementById('summaryTitle'),
+            summaryDesc: document.getElementById('summaryDesc'),
+            nominalDiffVal: document.getElementById('nominalDiffVal'),
+            loanFinalNominal: document.getElementById('loanFinalNominal'),
+            investFinalNominal: document.getElementById('investFinalNominal'),
+            tableBody: document.getElementById('tableBody')
+        };
+
+        const formatCurrency = (val) => {
+            return new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 }).format(val);
+        };
+
+        function update() {
+            const initial = Number(inputs.initialAmount.value) || 0;
+            const years = Number(inputs.years.value);
+            const investRate = Number(inputs.investmentRate.value);
+            const loanRate = Number(inputs.loanRate.value);
+            const inflationRate = Number(inputs.inflationRate.value);
+
+            displays.yearsVal.innerText = `${years} 年`;
+            displays.investRateVal.innerText = `${investRate}%`;
+            displays.loanRateVal.innerText = `${loanRate}%`;
+            displays.inflationRateVal.innerText = `${inflationRate}%`;
+
+            const tableData = [];
+            const step = years <= 10 ? 1 : (years <= 20 ? 2 : 5);
+
+            for (let i = 0; i <= years; i += step) {
+                const realPower = initial / Math.pow(1 + inflationRate / 100, i);
+                const lVal = (initial * Math.pow(1 + loanRate / 100, i)) - initial;
+                const iVal = (initial * Math.pow(1 + investRate / 100, i)) - initial;
+                tableData.push({ year: i, loanValue: lVal, investValue: iVal, power: realPower, powerPercent: (realPower/initial)*100 });
+            }
+
+            const final = tableData[tableData.length-1];
+            const isInvestWinning = investRate > loanRate;
+            const diff = Math.abs(final.investValue - final.loanValue);
+
+            displays.summaryCard.className = `p-5 rounded-2xl border flex flex-col md:flex-row md:items-center gap-4 ${isInvestWinning ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`;
+            displays.summaryIcon.className = `w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl ${isInvestWinning ? 'bg-emerald-500' : 'bg-rose-500'}`;
+            displays.summaryIcon.innerHTML = isInvestWinning ? '<i class="fas fa-chart-line"></i>' : '<i class="fas fa-shield-alt"></i>';
+            displays.summaryTitle.innerText = isInvestWinning ? '決策建議：進行市場投資' : '決策建議：提前償還房貸';
+            displays.summaryDesc.innerText = `${years} 年後，此決策將為您額外帶來約 ${formatCurrency(diff)} 的價值。`;
+            displays.nominalDiffVal.innerText = formatCurrency(diff);
+            
+            displays.loanFinalNominal.innerText = formatCurrency(final.loanValue);
+            displays.investFinalNominal.innerText = formatCurrency(final.investValue);
+
+            displays.tableBody.innerHTML = '';
+            tableData.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition-colors';
+                tr.innerHTML = `
+                    <td class="px-5 py-4 font-bold text-slate-500">${row.year} 年</td>
+                    <td class="px-5 py-4 text-right text-rose-600 font-semibold">${formatCurrency(row.loanValue)}</td>
+                    <td class="px-5 py-4 text-right text-emerald-600 font-semibold">${formatCurrency(row.investValue)}</td>
+                    <td class="px-5 py-4 text-right bg-slate-50/50">
+                        <div class="flex flex-col items-end">
+                            <span class="font-black text-slate-700">${formatCurrency(row.power)}</span>
+                            <span class="text-[8px] text-slate-400 font-bold uppercase">購買力 ${row.powerPercent.toFixed(1)}%</span>
+                        </div>
+                    </td>
+                `;
+                displays.tableBody.appendChild(tr);
+            });
+        }
+
+        Object.values(inputs).forEach(input => input.addEventListener('input', update));
+        update();
+    </script>
+</body>
+</html>
